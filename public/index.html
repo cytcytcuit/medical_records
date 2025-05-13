@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Records Management</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.5/dist/web3.min.js"></script>
+</head>
+<body>
+    <h1>Medical Records Management</h1>
+
+    <!-- Connect MetaMask Button -->
+    <button id="connectButton">Connect MetaMask</button>
+
+    <!-- Add Medical Record Form -->
+    <div>
+        <h2>Add Medical Record</h2>
+        <input id="patientName" type="text" placeholder="Patient Name" />
+        <input id="doctorName" type="text" placeholder="Doctor Name" />
+        <input id="diagnosis" type="text" placeholder="Diagnosis" />
+        <button id="addRecordButton">Add Record</button>
+    </div>
+
+    <!-- Records List -->
+    <div id="records">
+        <h2>Your Records</h2>
+        <ul id="recordList"></ul>
+    </div>
+
+    <script>
+        // Smart Contract Configuration
+        const contractAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"; // Sesuaikan dengan alamat kontrak Anda
+        const contractABI = [
+            {
+                "inputs": [
+                    {
+                        "internalType": "string",
+                        "name": "_patientName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "_doctorName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "_diagnosis",
+                        "type": "string"
+                    }
+                ],
+                "name": "addRecord",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getRecords",
+                "outputs": [
+                    {
+                        "components": [
+                            { "internalType": "string", "name": "patientName", "type": "string" },
+                            { "internalType": "string", "name": "doctorName", "type": "string" },
+                            { "internalType": "string", "name": "diagnosis", "type": "string" },
+                            { "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+                        ],
+                        "internalType": "struct MedicalRecords.Record[]",
+                        "name": "",
+                        "type": "tuple[]"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
+
+        let web3;
+        let contract;
+
+        // Connect MetaMask
+        async function connectMetaMask() {
+            if (window.ethereum) {
+                web3 = new Web3(window.ethereum);
+                try {
+                    await window.ethereum.request({ method: "eth_requestAccounts" });
+                    contract = new web3.eth.Contract(contractABI, contractAddress);
+                    console.log("Connected to MetaMask");
+                } catch (error) {
+                    console.error("User denied MetaMask connection");
+                }
+            } else {
+                alert("MetaMask is not installed!");
+            }
+        }
+
+        document.getElementById("connectButton").onclick = connectMetaMask;
+
+        // Add Record
+        document.getElementById("addRecordButton").onclick = async function () {
+            const patientName = document.getElementById("patientName").value;
+            const doctorName = document.getElementById("doctorName").value;
+            const diagnosis = document.getElementById("diagnosis").value;
+
+            if (!patientName || !doctorName || !diagnosis) {
+                alert("All fields are required!");
+                return;
+            }
+
+            try {
+                const accounts = await web3.eth.getAccounts();
+                const fromAccount = accounts[0];
+
+                // Save to Blockchain
+                await contract.methods.addRecord(patientName, doctorName, diagnosis)
+                    .send({ from: fromAccount });
+
+                console.log("Record added to blockchain");
+
+                // Save to MySQL
+                fetch("http://localhost:3000/addRecord", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        patientName: patientName,
+                        doctorName: doctorName,
+                        diagnosis: diagnosis
+                    })
+                })
+                .then(response => response.json())
+                .then(data => console.log("Record saved to MySQL:", data))
+                .catch(err => console.error("MySQL Error:", err));
+
+            } catch (err) {
+                console.error("Error adding record:", err);
+            }
+        };
+    </script>
+</body>
+</html>
+
